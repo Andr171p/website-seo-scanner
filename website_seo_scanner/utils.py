@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from playwright.async_api import async_playwright
+from playwright.async_api import Browser, Page, async_playwright
 from pydantic import BaseModel
 
 # JS скрипт для анализа производительности рендеринга страницы
@@ -48,3 +48,14 @@ async def measure_page_rendering_time(url: str) -> PageRenderingInfo:
         await page.goto(url, wait_until="networkidle")
         response = await page.evaluate(JS_PERFORMANCE_SCRIPT)
         return PageRenderingInfo.model_validate(response)
+
+
+async def get_current_page(browser: Browser) -> Page:
+    """Получает текущую страницу в браузере"""
+    if not browser.contexts:
+        context = await browser.new_context()
+        return await context.new_page()
+    context = browser.contexts[0]
+    if not context.pages:
+        return await context.new_page()
+    return context.pages[-1]
