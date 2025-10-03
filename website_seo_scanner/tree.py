@@ -154,7 +154,7 @@ def build_site_tree(url: str) -> TreeNode:
         .replace("https://", "")
         .replace("/", "")
     )
-    root = TreeNode(name=name, url=url)
+    root = TreeNode(name=name, url=HttpUrl(url))
     sitemap = sitemap_tree_for_homepage(url, use_robots=False)
     for page in sitemap.all_pages():
         segments = parse_url_path(page.url)

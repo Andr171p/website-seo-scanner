@@ -1,9 +1,18 @@
-from website_seo_scanner.tree import build_site_tree
+import asyncio
 
-url = "https://1c.ru/"
+from playwright.async_api import async_playwright
 
-tree = build_site_tree(url)
+from website_seo_scanner.linting import lint_page_content
 
-print(tree.to_string())
-print(tree.max_depth())
-print(tree.count_nodes())
+url = "http://www.diocon.ru/"
+
+
+async def main() -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=False)
+        issues = await lint_page_content(browser, url)
+        for issue in issues:
+            print(issue)
+
+
+asyncio.run(main())

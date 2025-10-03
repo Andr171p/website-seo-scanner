@@ -14,6 +14,7 @@ OPTIMAL_TITLE_DELTA = 10
 SEMANTIC_TAGS: Final[list[str]] = [
     "header", "nav", "main", "article", "section", "aside", "footer"
 ]
+MAX_META_DESCRIPTION_LENGTH = 160
 
 
 class IssueLevel(StrEnum):
@@ -62,6 +63,34 @@ def check_title(soup: BeautifulSoup) -> list[PageIssue]:
             Оптимальная длина от {OPTIMAL_TITLE_LENGTH - OPTIMAL_TITLE_DELTA}
             до {OPTIMAL_TITLE_LENGTH + OPTIMAL_TITLE_DELTA}.""",
             element="title"
+        ))
+    return issues
+
+
+def check_meta_description(soup: BeautifulSoup) -> list[PageIssue]:
+    """Проверка meta описания страницы"""
+    issues: list[PageIssue] = []
+    meta_description = soup.find("meta", attrs={"name": "description"})
+    if not meta_description:
+        issues.append(PageIssue(
+            level=IssueLevel.ERROR,
+            message="Отсутствует meta-описание",
+            element="meta"
+        ))
+        return issues
+    content = meta_description.get("content", "").strip()
+    if not content:
+        issues.append(PageIssue(
+            level=IssueLevel.ERROR,
+            message="Пустое meta-описание",
+            element="meta"
+        ))
+    elif len(content) > MAX_META_DESCRIPTION_LENGTH:
+        issues.append(PageIssue(
+            level=IssueLevel.WARNING,
+            message=f"Meta-описание слишком длинное ({len(content)} символов)! "
+            f"Рекомендуется от 120 до 160 символов.",
+            element="meta"
         ))
     return issues
 
@@ -140,9 +169,21 @@ def check_semantic_structure(soup: BeautifulSoup) -> list[PageIssue]:
     return issues
 
 
-async def validate_html(browser: Browser, url: str) -> ...:
+async def lint_page_content(browser: Browser, url: str) -> list[PageIssue]:
+    """Выполняет SEO линтинг страницы. Возвращает найденные ошибки.
+
+    :param browser: Объект Playwright браузера.
+    :param url: URL адрес страницы.
+    :return Список найденных SEO ошибок страницы.
+    """
     page = await get_current_page(browser)
     await page.goto(url)
     content = await page.content()
     soup = BeautifulSoup(content, "html.parser")
-    return ...
+    return [
+        *check_title(soup),
+        *check_meta_description(soup),
+        *check_heading(soup),
+        *check_images(soup),
+        *check_semantic_structure(soup)
+    ]
