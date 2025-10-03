@@ -4,10 +4,10 @@ import re
 from enum import StrEnum
 
 from bs4 import BeautifulSoup
-from playwright.async_api import Browser
+from playwright.async_api import Page
 from pydantic import BaseModel
 
-from .utils import get_current_page
+from .nlp import compare_texts
 
 OPTIMAL_TITLE_LENGTH = 55
 OPTIMAL_TITLE_DELTA = 10
@@ -15,6 +15,16 @@ SEMANTIC_TAGS: Final[list[str]] = [
     "header", "nav", "main", "article", "section", "aside", "footer"
 ]
 MAX_META_DESCRIPTION_LENGTH = 160
+SHORT_RELEVANCE_SCORE, CRITICAL_RELEVANCE_SCORE = 0.5, 0.3
+# Максимальные штрафы за каждую категорию
+MAX_PENALTIES: Final[dict[str, int]] = {
+    "title": 20,
+    "meta": 15,
+    "headings": 25,
+    "images": 20,
+    "semantic": 10,
+    "relevance": 10,
+}
 
 
 class IssueLevel(StrEnum):
@@ -169,15 +179,44 @@ def check_semantic_structure(soup: BeautifulSoup) -> list[PageIssue]:
     return issues
 
 
-async def lint_page_content(browser: Browser, url: str) -> list[PageIssue]:
+def check_meta_and_content_similarity(soup: BeautifulSoup) -> list[PageIssue]:
+    """Проверяет сематическое соответствие между meta-описанием и контентом на странице"""
+    issues: list[PageIssue] = []
+    meta_description = soup.find("meta", attrs={"name": "description"})
+    content = meta_description.get("content", "").strip()
+    body = soup.find("body")
+    if body is None:
+        issues.append(PageIssue(
+            level=IssueLevel.ERROR,
+            message="Страница с пустым контентом",
+            element="body"
+        ))
+        return issues
+    text = body.get_text(separator="\n", strip=True)
+    similarity_score = compare_texts(content, text)
+    if CRITICAL_RELEVANCE_SCORE < similarity_score < SHORT_RELEVANCE_SCORE:
+        issues.append(PageIssue(
+            level=IssueLevel.INFO,
+            message="Соответствие meta-описания к контенту страницы, "
+            f"Релевантность: {round(similarity_score * 100, 2)}%",
+            element="body"
+        ))
+    elif similarity_score <= CRITICAL_RELEVANCE_SCORE:
+        issues.append(PageIssue(
+            level=IssueLevel.WARNING,
+            message="Низкое соответствие meta-описания к контенту страницы, "
+                    f"Релевантность: {similarity_score * 100}%",
+            element="body"
+        ))
+    return issues
+
+
+async def lint_page(page: Page) -> list[PageIssue]:
     """Выполняет SEO линтинг страницы. Возвращает найденные ошибки.
 
-    :param browser: Объект Playwright браузера.
-    :param url: URL адрес страницы.
+    :param page: Объект Playwright страницы.
     :return Список найденных SEO ошибок страницы.
     """
-    page = await get_current_page(browser)
-    await page.goto(url)
     content = await page.content()
     soup = BeautifulSoup(content, "html.parser")
     return [
@@ -185,5 +224,6 @@ async def lint_page_content(browser: Browser, url: str) -> list[PageIssue]:
         *check_meta_description(soup),
         *check_heading(soup),
         *check_images(soup),
-        *check_semantic_structure(soup)
+        *check_semantic_structure(soup),
+        *check_meta_and_content_similarity(soup),
     ]
