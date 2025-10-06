@@ -38,6 +38,7 @@ class PageIssue(BaseModel):
     """Проблема на странице"""
     level: IssueLevel
     message: str
+    category: str
     element: str
 
 
@@ -49,6 +50,7 @@ def check_title(soup: BeautifulSoup) -> list[PageIssue]:
         issues.append(PageIssue(
             level=IssueLevel.ERROR,
             message="Отсутсвует тэг <title>!",
+            category="title",
             element="title"
         ))
     text = tag.get_text().strip()
@@ -56,6 +58,7 @@ def check_title(soup: BeautifulSoup) -> list[PageIssue]:
         issues.append(PageIssue(
             level=IssueLevel.ERROR,
             message="Тег <title> пустой!",
+            category="title",
             element="title"
         ))
     if len(text) < OPTIMAL_TITLE_LENGTH - OPTIMAL_TITLE_DELTA:
@@ -64,6 +67,7 @@ def check_title(soup: BeautifulSoup) -> list[PageIssue]:
             message=f"""Title слишком короткий ({len(text)} символов)!
             Оптимальная длина от {OPTIMAL_TITLE_LENGTH - OPTIMAL_TITLE_DELTA}
             до {OPTIMAL_TITLE_LENGTH + OPTIMAL_TITLE_DELTA}.""",
+            category="title",
             element="title"
         ))
     if len(text) > OPTIMAL_TITLE_LENGTH + OPTIMAL_TITLE_DELTA:
@@ -72,6 +76,7 @@ def check_title(soup: BeautifulSoup) -> list[PageIssue]:
             message=f"""Title слишком длинный ({len(text)} символов)!
             Оптимальная длина от {OPTIMAL_TITLE_LENGTH - OPTIMAL_TITLE_DELTA}
             до {OPTIMAL_TITLE_LENGTH + OPTIMAL_TITLE_DELTA}.""",
+            category="title",
             element="title"
         ))
     return issues
@@ -85,6 +90,7 @@ def check_meta_description(soup: BeautifulSoup) -> list[PageIssue]:
         issues.append(PageIssue(
             level=IssueLevel.ERROR,
             message="Отсутствует meta-описание",
+            category="meta",
             element="meta"
         ))
         return issues
@@ -93,6 +99,7 @@ def check_meta_description(soup: BeautifulSoup) -> list[PageIssue]:
         issues.append(PageIssue(
             level=IssueLevel.ERROR,
             message="Пустое meta-описание",
+            category="meta",
             element="meta"
         ))
     elif len(content) > MAX_META_DESCRIPTION_LENGTH:
@@ -100,6 +107,7 @@ def check_meta_description(soup: BeautifulSoup) -> list[PageIssue]:
             level=IssueLevel.WARNING,
             message=f"Meta-описание слишком длинное ({len(content)} символов)! "
             f"Рекомендуется от 120 до 160 символов.",
+            category="meta",
             element="meta"
         ))
     return issues
@@ -113,12 +121,14 @@ def check_heading(soup: BeautifulSoup) -> list[PageIssue]:
         issues.append(PageIssue(
             level=IssueLevel.ERROR,
             message="Отсутствует тег H1",
+            category="heading",
             element="h1"
         ))
     elif len(h1_tags) > 1:
         issues.append(PageIssue(
             level=IssueLevel.WARNING,
             message=f"Найдено {len(h1_tags)} тегов H1. Рекомендуется только один H1 на страницу",
+            category="heading",
             element="h1"
         ))
     headings = soup.find_all(re.compile(r"^h[1-6]$"))
@@ -129,6 +139,7 @@ def check_heading(soup: BeautifulSoup) -> list[PageIssue]:
             issues.append(PageIssue(
                 level=IssueLevel.WARNING,
                 message=f"Нарушена иерархия заголовков: H{level} после H{last_level}",
+                category="heading",
                 element=heading.name
             ))
         last_level = level
@@ -145,6 +156,7 @@ def check_images(soup: BeautifulSoup) -> list[PageIssue]:
             issues.append(PageIssue(
                 level=IssueLevel.WARNING,
                 message="Изображение без атрибута 'alt'",
+                category="image",
                 element="img"
             ))
         if (
@@ -160,6 +172,7 @@ def check_images(soup: BeautifulSoup) -> list[PageIssue]:
             issues.append(PageIssue(
                 level=IssueLevel.INFO,
                 message="В названии файла изображения нет описания",
+                category="image",
                 element="img"
             ))
     return issues
@@ -174,6 +187,7 @@ def check_semantic_structure(soup: BeautifulSoup) -> list[PageIssue]:
             issues.append(PageIssue(
                 level=IssueLevel.INFO,
                 message=f"Не используется сематический тег <{semantic_tag}>",
+                category="semantic",
                 element=semantic_tag
             ))
     return issues
@@ -189,6 +203,7 @@ def check_meta_and_content_similarity(soup: BeautifulSoup) -> list[PageIssue]:
         issues.append(PageIssue(
             level=IssueLevel.ERROR,
             message="Страница с пустым контентом",
+            category="semantic",
             element="body"
         ))
         return issues
@@ -199,6 +214,7 @@ def check_meta_and_content_similarity(soup: BeautifulSoup) -> list[PageIssue]:
             level=IssueLevel.INFO,
             message="Соответствие meta-описания к контенту страницы, "
             f"Релевантность: {round(similarity_score * 100, 2)}%",
+            category="semantic",
             element="body"
         ))
     elif similarity_score <= CRITICAL_RELEVANCE_SCORE:
@@ -206,6 +222,7 @@ def check_meta_and_content_similarity(soup: BeautifulSoup) -> list[PageIssue]:
             level=IssueLevel.WARNING,
             message="Низкое соответствие meta-описания к контенту страницы, "
                     f"Релевантность: {similarity_score * 100}%",
+            category="semantic",
             element="body"
         ))
     return issues
