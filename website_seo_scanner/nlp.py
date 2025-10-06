@@ -9,9 +9,7 @@ from pydantic import BaseModel, Field
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-MIN_TEXTS = 2
-
-nlp: Final[spacy.Language] = spacy.load("")
+nlp: Final[spacy.Language] = ...
 
 llm: Final[BaseChatModel] = ...
 

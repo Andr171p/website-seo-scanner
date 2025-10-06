@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Final
 
+from collections import Counter
 from enum import StrEnum
 
 from playwright.async_api import Browser, Page
@@ -182,6 +183,7 @@ async def form_page_report(browser: Browser, url: str) -> PageReport:
     seo_score = calculate_page_seo_score(
         rendering_info.dom_content_loaded / 100, issues, meta_relevance_score
     )
+    issue_level_counts = Counter(issue.level for issue in issues)
     return PageReport(
         url=HttpUrl(url),
         rendering_time=rendering_info.dom_content_loaded,
@@ -189,7 +191,7 @@ async def form_page_report(browser: Browser, url: str) -> PageReport:
         meta_relevance_score=meta_relevance_score,
         status=determine_status(seo_score),
         issues=issues,
-        errors=len([1 for issue in issues if issue.level == IssueLevel.ERROR]),
-        warnings=len([1 for issue in issues if issue.level == IssueLevel.WARNING]),
-        infos=len([1 for issue in issues if issue.level == IssueLevel.WARNING])
+        errors=issue_level_counts[IssueLevel.ERROR],
+        warnings=issue_level_counts[IssueLevel.WARNING],
+        infos=issue_level_counts[IssueLevel.INFO],
     )
