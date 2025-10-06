@@ -64,7 +64,7 @@ STATUS_THRESHOLDS: Final[dict[ReportStatus, float]] = {
 class PageReport(BaseModel):
     """SEO отчет по странице"""
     url: HttpUrl
-    rendering_time: NonNegativeInt
+    rendering_time: NonNegativeFloat
     seo_score: NonNegativeFloat
     meta_relevance_score: NonNegativeFloat
     status: ReportStatus
@@ -180,13 +180,12 @@ async def form_page_report(browser: Browser, url: str) -> PageReport:
     await page.goto(url)
     issues = await lint_page(page)
     meta_relevance_score = await get_meta_relevance_score(page)
-    seo_score = calculate_page_seo_score(
-        rendering_info.dom_content_loaded / 100, issues, meta_relevance_score
-    )
+    rendering_time = rendering_info.dom_content_loaded / 100
+    seo_score = calculate_page_seo_score(rendering_time, issues, meta_relevance_score)
     issue_level_counts = Counter(issue.level for issue in issues)
     return PageReport(
         url=HttpUrl(url),
-        rendering_time=rendering_info.dom_content_loaded,
+        rendering_time=rendering_time,
         seo_score=seo_score,
         meta_relevance_score=meta_relevance_score,
         status=determine_status(seo_score),

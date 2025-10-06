@@ -9,6 +9,7 @@ dependencies = [
     "langchain>=0.3.27",
     "mypy>=1.18.2",
     "playwright>=1.55.0",
+    "playwright-stealth>=2.0.0",
     "ruff>=0.13.2",
     "scikit-learn>=1.7.2",
     "spacy>=3.8.7",

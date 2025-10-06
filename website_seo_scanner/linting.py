@@ -53,6 +53,7 @@ def check_title(soup: BeautifulSoup) -> list[PageIssue]:
             category="title",
             element="title"
         ))
+        return issues
     text = tag.get_text().strip()
     if not text:
         issues.append(PageIssue(
