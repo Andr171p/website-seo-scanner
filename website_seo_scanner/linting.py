@@ -235,6 +235,7 @@ async def lint_page(page: Page) -> list[PageIssue]:
     :param page: Объект Playwright страницы.
     :return Список найденных SEO ошибок страницы.
     """
+    await page.wait_for_selector("body:not(:empty)")
     content = await page.content()
     soup = BeautifulSoup(content, "html.parser")
     return [

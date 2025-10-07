@@ -5,13 +5,12 @@ from typing import Final
 from collections import Counter
 from enum import StrEnum
 
-from playwright.async_api import Browser, Page
+from playwright.async_api import Page
 from pydantic import BaseModel, HttpUrl, NonNegativeFloat, NonNegativeInt
 
 from .linting import IssueLevel, PageIssue, lint_page
 from .nlp import compare_texts
 from .performance import measure_page_rendering_time
-from .utils import get_current_page
 
 # Оптимальное время рендеринга страницы в секундах
 OPTIMAL_PAGE_LOAD_TIME = 2.5
@@ -53,11 +52,11 @@ class ReportStatus(StrEnum):
 
 # Пороговые значения для статуса отчета по странице
 STATUS_THRESHOLDS: Final[dict[ReportStatus, float]] = {
-    ReportStatus.GREAT: 90.0,
-    ReportStatus.GOOD: 75.0,
-    ReportStatus.SATISFACTORILY: 60.0,
-    ReportStatus.BAD: 40.0,
-    # CRITICAL: < 40.0
+    ReportStatus.GREAT: 85.0,
+    ReportStatus.GOOD: 70.0,
+    ReportStatus.SATISFACTORILY: 45.0,
+    ReportStatus.BAD: 30.0,
+    # CRITICAL: < 30.0
 }
 
 
@@ -168,19 +167,18 @@ def determine_status(seo_score: float) -> ReportStatus:
     return ReportStatus.CRITICAL
 
 
-async def form_page_report(browser: Browser, url: str) -> PageReport:
+async def form_page_report(page: Page, url: str) -> PageReport:
     """Формирует отчет по странице сайта.
 
-    :param browser: Текущее состояние Playwright браузера.
+    :param page: Текущая Playwright страница.
     :param url: URL страницы сайта по которой нужно сформировать ответ.
     :return Отчет по странице.
     """
     rendering_info = await measure_page_rendering_time(url)
-    page = await get_current_page(browser)
     await page.goto(url)
     issues = await lint_page(page)
     meta_relevance_score = await get_meta_relevance_score(page)
-    rendering_time = rendering_info.dom_content_loaded / 100
+    rendering_time = rendering_info.dom_content_loaded / 1000
     seo_score = calculate_page_seo_score(rendering_time, issues, meta_relevance_score)
     issue_level_counts = Counter(issue.level for issue in issues)
     return PageReport(

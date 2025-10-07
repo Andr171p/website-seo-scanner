@@ -3,8 +3,6 @@ import logging
 from bs4 import BeautifulSoup
 from playwright.async_api import Browser, Page
 
-from .stealth import new_stealth_context
-
 TIMEOUT = 600
 
 logger = logging.getLogger(__name__)
@@ -64,15 +62,16 @@ async def wait_for_full_page_load(page: Page, timeout: int = TIMEOUT) -> None:
         """, timeout=timeout)
 
 
-async def get_current_page(browser: Browser, is_stealth: bool = True) -> Page:
+async def get_current_page(browser: Browser) -> Page:
     """Получает текущую страницу в браузере.
 
     :param browser: Playwright браузер.
-    :param is_stealth: Использовать ли скрытый режим.
     :return Текущая страница.
     """
     if not browser.contexts:
-        context = await new_stealth_context(browser) if is_stealth else await browser.new_context()
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"  # noqa: E501
+        )
         return await context.new_page()
     context = browser.contexts[0]
     if not context.pages:
