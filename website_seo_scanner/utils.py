@@ -3,6 +3,8 @@ import logging
 from bs4 import BeautifulSoup
 from playwright.async_api import Browser, Page
 
+from .stealth import create_new_stealth_context
+
 TIMEOUT = 600
 
 logger = logging.getLogger(__name__)
@@ -69,9 +71,8 @@ async def get_current_page(browser: Browser) -> Page:
     :return Текущая страница.
     """
     if not browser.contexts:
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"  # noqa: E501
-        )
+        """context = await browser.new_context()"""
+        context = await create_new_stealth_context(browser)
         return await context.new_page()
     context = browser.contexts[0]
     if not context.pages:

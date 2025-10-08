@@ -174,7 +174,7 @@ async def form_page_report(page: Page, url: str) -> PageReport:
     :param url: URL страницы сайта по которой нужно сформировать ответ.
     :return Отчет по странице.
     """
-    rendering_info = await measure_page_rendering_time(url)
+    rendering_info = await measure_page_rendering_time(page, url)
     await page.goto(url)
     issues = await lint_page(page)
     meta_relevance_score = await get_meta_relevance_score(page)

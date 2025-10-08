@@ -1,4 +1,4 @@
-from playwright.async_api import async_playwright
+from playwright.async_api import Page
 from pydantic import BaseModel
 
 # JS скрипт для анализа производительности рендеринга страницы
@@ -34,15 +34,13 @@ class PageRenderingInfo(BaseModel):
     first_paint: int
 
 
-async def measure_page_rendering_time(url: str) -> PageRenderingInfo:
+async def measure_page_rendering_time(page: Page, url: str) -> PageRenderingInfo:
     """Измеряет скорость рендеринга страницы.
-
+`
+    :param page: Текущая playwright страница.
     :param url: URL адрес страницы.
     :return информация о рендеринге страницы.
     """
-    async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=False)
-        page = await browser.new_page()
-        await page.goto(url, wait_until="networkidle")
-        response = await page.evaluate(JS_PERFORMANCE_SCRIPT)
-        return PageRenderingInfo.model_validate(response)
+    await page.goto(url, wait_until="networkidle")
+    response = await page.evaluate(JS_PERFORMANCE_SCRIPT)
+    return PageRenderingInfo.model_validate(response)
