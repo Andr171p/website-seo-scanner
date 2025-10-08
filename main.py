@@ -50,8 +50,8 @@ async def main() -> None:
             ]
         )
         page = await get_current_page(browser)
-        await page.goto(test_url)
-        await asyncio.sleep(25)
+        """await page.goto(test_url)
+        await asyncio.sleep(25)"""
         report = await form_page_report(page, url2)
         print(report.model_dump())
 

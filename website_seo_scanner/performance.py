@@ -1,3 +1,5 @@
+from typing import Self
+
 from playwright.async_api import Page
 from pydantic import BaseModel
 
@@ -25,13 +27,13 @@ class PageRenderingInfo(BaseModel):
     """Информация с метриками по загрузке страницы.
 
     Attributes:
-        dom_content_loaded: Время до полной загрузки HTML DOM в мс.
+        dom_content_loaded: Время до полной загрузки HTML DOM в ms.
         load_event: Время до полной загрузки страницы со всеми ресурсами в мс.
         first_paint: Первое отображение элемента на экране в мс.
     """
-    dom_content_loaded: int
-    load_event: int
-    first_paint: int
+    dom_content_loaded: float
+    load_event: float
+    first_paint: float
 
 
 async def measure_page_rendering_time(page: Page, url: str) -> PageRenderingInfo:
