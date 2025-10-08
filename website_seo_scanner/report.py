@@ -52,7 +52,7 @@ async def form_page_report(page: Page, url: str) -> PageReport:
     """Формирует отчет по странице сайта.
 
     :param page: Текущая Playwright страница.
-    :param url: URL страницы сайта по которой нужно сформировать ответ.
+    :param url: URL страницы сайта по которой нужно сформировать отчет.
     :return Отчет по странице.
     """
     rendering_info = await measure_page_rendering_time(page, url)
