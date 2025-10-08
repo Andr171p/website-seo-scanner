@@ -308,7 +308,7 @@ def check_meta_and_content_similarity(soup: BeautifulSoup) -> list[PageFinding]:
 
 
 async def lint_page(page: Page) -> list[PageFinding]:
-    """Выполняет SEO линтинг страницы. Возвращает найденные ошибки.
+    """Выполняет SEO линтинг страницы. Возвращает найденные замечания.
 
     :param page: Объект Playwright страницы.
     :return Список найденных SEO замечаний страницы.
