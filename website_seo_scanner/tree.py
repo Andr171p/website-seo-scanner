@@ -68,10 +68,10 @@ class TreeNode(BaseModel):
                 return found
         return None
 
-    def to_string(self) -> str:
+    def to_string(self, max_depth: int | None = None) -> str:
         """Представление дерева в человеко-читаемом формате"""
         lines: list[str] = []
-        self.draw_tree_lines(lines, max_depth=None)
+        self.draw_tree_lines(lines, max_depth=max_depth)
         return "\n".join(lines)
 
     def draw_tree_lines(
@@ -114,6 +114,15 @@ class TreeNode(BaseModel):
             if node.last_modified and (latest is None or node.last_modified > latest):
                 latest = node.last_modified
         return latest
+
+    def last_changed_node(self) -> TreeNode:
+        """Последняя изменённая страница"""
+        latest_node = self
+        for node in self.iter_nodes():
+            if node.last_modified and \
+                    (latest_node is None or node.last_modified > latest_node.last_modified):
+                latest_node = node
+        return latest_node
 
 
 def add_page_to_tree(
