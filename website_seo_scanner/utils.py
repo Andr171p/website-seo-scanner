@@ -26,6 +26,12 @@ class SearchResult(BaseModel):
         return self.url == other.url
 
 
+class PageMeta(BaseModel):
+    """Meta-данные страницы"""
+    title: str
+    description: str | None = None
+
+
 async def wait_for_full_page_load(page: Page, timeout: int = TIMEOUT) -> None:
     """Ожидает полной загрузки страницы.
 
@@ -108,6 +114,20 @@ async def extract_page_text(page: Page) -> str:
     if body is None:
         return ""
     return body.get_text(separator="\n", strip=True)
+
+
+async def extract_page_meta(page: Page) -> PageMeta:
+    """Извлекает мета-данные страницы
+
+    :param page: Текущая Playwright страница.
+    :return Извлечённые мета-данные страницы.
+    """
+    title = await page.title()
+    description_element = await page.query_selector("meta[name='description']")
+    if description_element is None:
+        return PageMeta(title=title)
+    description = await description_element.get_attribute("content")
+    return PageMeta(title=title, description=description)
 
 
 def websearch(query: str, max_results: int = 7) -> list[SearchResult]:
