@@ -1,12 +1,6 @@
-from website_seo_scanner.tree import build_site_tree
+from website_seo_scanner.tree import build_site_tree, extract_key_pages
 
 tree = build_site_tree("https://tyumen.1cbit.ru/")
-k = 0
-for node in tree.iter_nodes():
-    if node.is_leaf:
-        continue
-    print(node)
-    k += 1
 
+print(tree.to_string())
 
-print(k)

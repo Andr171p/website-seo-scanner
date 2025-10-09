@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from collections.abc import Iterator
 from datetime import datetime
 from urllib.parse import urlparse
@@ -9,6 +10,24 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field, HttpUrl
 from usp.objects.page import SitemapPage
 from usp.tree import sitemap_tree_for_homepage
+
+PRIORITY_KEYWORDS: tuple[str, ...] = (
+    "product",
+    "services",
+    "catalog",
+    "category",
+    "shop",
+    "blog",
+    "article",
+    "news",
+    "post",
+    "about",
+    "contact",
+    "price",
+    "buy",
+    "order",
+    "cases",
+)
 
 
 def parse_url_path(url: str) -> list[str]:
@@ -27,6 +46,19 @@ class TreeNode(BaseModel):
     priority: float | None = None
     last_modified: datetime | None = None
     children: list[TreeNode] = Field(default_factory=list)
+
+    @property
+    def sections(self) -> list[str]:
+        """Секции внутри которых находится страница"""
+        url = str(self.url)
+        domain = urlparse(url).netloc
+        url = (
+            url
+            .replace(domain, "")
+            .replace("http://", "")
+            .replace("https://", "")
+        )
+        return url.split("/")
 
     @property
     def is_leaf(self) -> bool:
@@ -124,6 +156,14 @@ class TreeNode(BaseModel):
                 latest_node = node
         return latest_node
 
+    def __hash__(self) -> int:
+        return hash(self.url)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TreeNode):
+            return False
+        return self.url == other.url
+
 
 def add_page_to_tree(
         base_url: str,
@@ -169,3 +209,18 @@ def build_site_tree(url: str) -> TreeNode:
         segments = parse_url_path(page.url)
         add_page_to_tree(url, root, page, segments)
     return root
+
+
+def extract_key_pages(tree: TreeNode, max_result: int = 15) -> set[HttpUrl]:
+    """Извлекает URL ключевых страниц сайта.
+
+    :param tree: Дерево сайта.
+    :param max_result: Максимальное количество извлекаемых страниц.
+    """
+    key_pages: set[HttpUrl] = {tree.url, tree.last_changed_node()}  # Первые ключевые страницы
+    for node in tree.iter_nodes():
+        if any(
+                priority_keyword in str(node.url).lower() for priority_keyword in PRIORITY_KEYWORDS
+        ):
+            key_pages.add(random.choice(node.children))  # noqa: S311
+    return key_pages[::max_result]

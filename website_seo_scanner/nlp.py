@@ -1,7 +1,5 @@
-from typing import Final, Literal
+from typing import Literal
 
-import spacy
-from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableSerializable
@@ -9,9 +7,7 @@ from pydantic import BaseModel, Field
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-nlp: Final[spacy.Language] = ...
-
-llm: Final[BaseChatModel] = ...
+from .depends import llm, nlp
 
 
 class KeywordsResponse(BaseModel):
@@ -26,11 +22,12 @@ def compare_texts(text1: str, text2: str) -> float:
     return cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
 
 
-def extract_keywords(text: str, strategy: Literal["llm", "ml"]) -> list[str]:
+def extract_keywords(text: str, strategy: Literal["llm", "ml"] = "ml") -> list[str]:
     """Извлекает ключевые слова из текста.
 
     :param text: Текст для извлечения ключевых слов.
-    :param strategy: Стратегия для извлечения: 'llm', 'ml'
+    :param strategy: Стратегия для извлечения: 'llm', 'ml'.
+    :return Список ключевых слов на странице.
     """
     match strategy:
         case "ml":

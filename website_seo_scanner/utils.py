@@ -1,13 +1,29 @@
 import logging
 
 from bs4 import BeautifulSoup
+from ddgs import DDGS
 from playwright.async_api import Browser, Page
+from pydantic import BaseModel, HttpUrl
 
 from .stealth import create_new_stealth_context
 
 TIMEOUT = 600
 
 logger = logging.getLogger(__name__)
+
+
+class SearchResult(BaseModel):
+    """Результат поиска в интернете"""
+    title: str
+    url: HttpUrl
+
+    def __hash__(self) -> int:
+        return hash(self.url)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SearchResult):
+            return False
+        return self.url == other.url
 
 
 async def wait_for_full_page_load(page: Page, timeout: int = TIMEOUT) -> None:
@@ -92,3 +108,16 @@ async def extract_page_text(page: Page) -> str:
     if body is None:
         return ""
     return body.get_text(separator="\n", strip=True)
+
+
+def websearch(query: str, max_results: int = 7) -> list[SearchResult]:
+    """Поиск в интернете.
+
+    :param query: Поисковый запрос.
+    :param max_results: Максимальное количество результатов.
+    :return Список из результатов поиска.
+    """
+    with DDGS as ddg:
+        return [SearchResult.model_validate({
+            "title": result["title"], "url": result["href"]
+        }) for result in ddg.text(query, max_results=max_results)]
