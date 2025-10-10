@@ -218,9 +218,11 @@ def extract_key_pages(tree: TreeNode, max_result: int = 15) -> set[HttpUrl]:
     :param max_result: Максимальное количество извлекаемых страниц.
     """
     key_pages: set[HttpUrl] = {tree.url, tree.last_changed_node()}  # Первые ключевые страницы
+    visited_pages: set[...] = set()
     for node in tree.iter_nodes():
         if any(
                 priority_keyword in str(node.url).lower() for priority_keyword in PRIORITY_KEYWORDS
         ):
+            key_pages.add(node.url)
             key_pages.add(random.choice(node.children))  # noqa: S311
     return key_pages[::max_result]

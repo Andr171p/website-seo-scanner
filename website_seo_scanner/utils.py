@@ -2,6 +2,7 @@ import logging
 
 from bs4 import BeautifulSoup
 from ddgs import DDGS
+from html2text import html2text
 from playwright.async_api import Browser, Page
 from pydantic import BaseModel, HttpUrl
 
@@ -103,7 +104,7 @@ async def get_current_page(browser: Browser) -> Page:
 
 
 async def extract_page_text(page: Page) -> str:
-    """Извлекает текст с текущей страницы.
+    """Извлекает весь текст с текущей страницы из body.
 
     :param page: Текущая Playwright страница.
     :return Текстовый контент страницы.
@@ -113,11 +114,11 @@ async def extract_page_text(page: Page) -> str:
     body = soup.find("body")
     if body is None:
         return ""
-    return body.get_text(separator="\n", strip=True)
+    return html2text(body.get_text(separator="\n", strip=True))
 
 
 async def extract_page_meta(page: Page) -> PageMeta:
-    """Извлекает мета-данные страницы
+    """Извлекает мета-данные страницы.
 
     :param page: Текущая Playwright страница.
     :return Извлечённые мета-данные страницы.

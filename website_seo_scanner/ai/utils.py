@@ -4,6 +4,7 @@ from langchain_core.runnables import RunnableSerializable
 from pydantic import BaseModel, Field, HttpUrl
 
 from ..depends import llm
+from ..schemas import AboutSite
 from .prompts import SEARCH_QUERIES_GENERATION_PROMPT
 
 DEFAULT_MAX_RESULTS = 15
@@ -15,27 +16,10 @@ class SearchQueriesResponse(BaseModel):
     )
 
 
-class AboutSite(BaseModel):
-    """Информация о сайте
-
-    Attributes:
-        url: Адрес сайта.
-        title: Название компании/сайта.
-        description: Описание компании/сайта.
-        industry: Отрасль или ниша.
-        target_audience: Целевая аудитория.
-        target_location: Целевой регион или город.
-        main_products: Основные продукты, услуги и.т.д компании.
-        key_features: Ключевые преимущества.
-    """
-    url: HttpUrl
-    title: str
-    description: str
-    industry: str
-    target_audience: str
-    target_location: str
-    main_products: list[str]
-    key_features: list[str]
+class KeySectionsResponse(BaseModel):
+    key_sections: list[str] = Field(
+        default_factory=list, description="Ключевые разделы сайта для seo анализа"
+    )
 
 
 async def generate_search_queries(
@@ -60,3 +44,25 @@ async def generate_search_queries(
     )
     response = await chain.ainvoke({**about_site.model_dump(), "max_result": max_results})
     return response.search_queries[::max_results]
+
+
+async def generate_key_sections(
+        url: HttpUrl, title: str, max_results: int = DEFAULT_MAX_RESULTS
+) -> list[str]:
+    """Генерирует ключевые разделы сайта,
+    которые могут быть полезны для SEO анализа.
+
+    :param url: URL адрес сайта.
+    :param title: Заголовок, название сайта.
+    :param max_results: Максимальное количество генерируемых разделов.
+    :return список ключевых разделов сайта.
+    """
+    parser = PydanticOutputParser(pydantic_object=KeySectionsResponse)
+    prompt = (
+        ChatPromptTemplate
+        .from_messages([("system", ...)])
+        .partial(format_instructions=parser.get_format_instructions())
+    )
+    chain: RunnableSerializable[dict[str, str], KeySectionsResponse] = prompt | llm | parser
+    response = await chain.ainvoke({"url": url, "title": title, "max_results": max_results})
+    return response.key_sections[::max_results]
