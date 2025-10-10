@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from sklearn.cluster import KMeans
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import silhouette_score
 from sklearn.metrics.pairwise import cosine_similarity
 
 from .depends import llm, nlp
@@ -96,10 +97,6 @@ def extract_keywords_using_tfidf(text: str, top_n: int = 20) -> ...:
     }).sort("scores", descending=True).head(top_n)
 
 
-def extract_lsi_sequences(text: str) -> ...:
-    ...
-
-
 def preprocess_text(text: str) -> str:
     """Предобработка текста: очистка, лемматизация, удаление стоп-слов.
 
@@ -119,19 +116,73 @@ def preprocess_text(text: str) -> str:
     return " ".join(processed_tokens)
 
 
+def calculate_cluster_entropy(cluster_center: np.ndarray[float]) -> float:
+    """Расчет энтропии кластера для оценки его чистоты"""
+    normalized_center = np.abs(cluster_center)
+    if normalized_center.sum() == 0:
+        return 0.0
+    normalized_center /= normalized_center.sum()
+    # Расчет энтропии Шеннона
+    entropy = -np.sum(normalized_center * np.log2(normalized_center + 1e-10))
+    return float(entropy)
+
+
+def find_optimal_clusters(texts: list[str], max_features: int) -> int:
+    """Поиск оптимального количества текстовых кластеров методом силуэта.
+
+    :param texts: Тексты для кластеризации.
+    :param max_features: Выборка первых N признаков на основе количества.
+    :return Оптимальное число кластеров.
+    """
+    if len(texts) == 1:
+        return 1
+    vectorizer = TfidfVectorizer(
+        max_features=max_features,
+        min_df=1,
+        max_df=0.8,
+        stop_words=None
+    )
+    tfidf_matrix = vectorizer.fit_transform(texts)
+    # Метод локтя с силуэтным анализом
+    max_possible = min(10, len(texts) - 1)
+    best_score = -1
+    best_k = 2
+    for k in range(2, max_possible + 1):
+        try:
+            svd = TruncatedSVD(n_components=k)
+            lsi_vectors = svd.fit_transform(tfidf_matrix)
+            kmeans = KMeans(n_clusters=k, random_state=RANDOM_STATE, n_init=5)
+            clusters = kmeans.fit_predict(lsi_vectors)
+            if len(np.unique(clusters)) > 1:
+                score = silhouette_score(lsi_vectors, clusters)
+                if score > best_score:
+                    best_score = score
+                    best_k = k
+        except ValueError:
+            continue
+    return best_k
+
+
 def get_semantic_clusters(
         texts: list[str], n_clusters: int = 5, max_features: int = 1000
 ) -> ...:
-    """Получение смысловых кластеров в текстах"""
+    """Получение смысловых кластеров в текстах
+
+    :param texts: Тексты для семантического анализа.
+    :param n_clusters: Количество кластеров.
+    :param max_features: Максимальное количество признаков.
+    :return ...
+    """
     preprocessed_texts = [preprocess_text(text) for text in texts]
     # TF-IDF векторизация текста
     vectorizer = TfidfVectorizer(max_features=max_features, ngram_range=(1, 3))
     tfidf_matrix = vectorizer.fit_transform(preprocessed_texts)
     # LSI (Latent Semantic Indexing) с SVD
-    svd_model = TruncatedSVD(n_components=n_clusters, random_state=RANDOM_STATE)
-    lsi_vectors = svd_model.fit_transform(tfidf_matrix)
+    svd = TruncatedSVD(n_components=n_clusters, random_state=RANDOM_STATE)
+    lsi_vectors = svd.fit_transform(tfidf_matrix)
     # Кластеризация
-    kmeans = KMeans(n_clusters=n_clusters, random_state=RANDOM_STATE)
+    optimal_n_clusters = min(n_clusters, find_optimal_clusters(texts, max_features))
+    kmeans = KMeans(n_clusters=optimal_n_clusters, random_state=RANDOM_STATE)
     clusters = kmeans.fit_predict(lsi_vectors)
     # Ключевые слова для каждого кластера
     cluster_keywords: dict[int, dict[str, list[str] | int]] = {}
@@ -149,3 +200,7 @@ def get_semantic_clusters(
                 "doc_count": len(cluster_indices)
             }
     return clusters, cluster_keywords
+
+
+def build_lsi_graph(text: str) -> ...:
+    ...

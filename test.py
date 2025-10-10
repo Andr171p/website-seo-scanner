@@ -2,7 +2,11 @@ import asyncio
 
 from playwright.async_api import async_playwright
 
-from website_seo_scanner.nlp import extract_keywords_using_tfidf, preprocess_text
+from website_seo_scanner.nlp import (
+    extract_keywords_using_tfidf,
+    find_optimal_clusters,
+    get_semantic_clusters,
+)
 from website_seo_scanner.utils import extract_page_text
 
 url = "http://www.diocon.ru/introduction/borovskaya-ptitsefabrika/"
@@ -15,8 +19,10 @@ async def main() -> None:
         page = await browser.new_page()
         await page.goto(url)
         text = await extract_page_text(page)
-        preprocessed_text = preprocess_text(text)
-        print(extract_keywords_using_tfidf(preprocessed_text))
+        await page.goto(url1)
+        text1 = await extract_page_text(page)
+        print(find_optimal_clusters([text, text1], max_features=5))
+        print(get_semantic_clusters([text, text1]))
 
 
 asyncio.run(main())
