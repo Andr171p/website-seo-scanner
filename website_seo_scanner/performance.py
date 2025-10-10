@@ -1,5 +1,3 @@
-from typing import Self
-
 from playwright.async_api import Page
 from pydantic import BaseModel
 
