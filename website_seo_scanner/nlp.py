@@ -9,6 +9,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
+from nltk.util import ngrams
 from sklearn.cluster import HDBSCAN
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -33,19 +34,17 @@ MIN_SENTENCE_LENGTH = 10
 stopwords: Final[set[str]] = set(stopwords.words("russian"))
 
 
-def split_sentences(text: str) -> list[str]:
-    return [
-        sentence.strip()
-        for sentence in text.split(".")
-        if len(sentence.strip()) > MIN_SENTENCE_LENGTH
-    ]
+def extract_ngrams(text: str, n: int) -> list[tuple[str, ...]]:
+    tokens = word_tokenize(text)
+    tokens = [token for token in tokens if token not in stopwords]
+    return list(ngrams(tokens, n))
 
 
-def split_text(text: str) -> list[str]:
+def split_text(
+        text: str, chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP
+) -> list[str]:
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
-        length_function=len,
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap, length_function=len
     )
     return splitter.split_text(text)
 
@@ -82,12 +81,16 @@ def extract_keyphrases(text: str, top_k: int) -> list[str]:
     :param top_k: Количество получаемых ключевых фраз.
     :return Извлечённые ключевые фразы.
     """
-    sentences = split_sentences(text)
-    sentence_vectors = embeddings.embed_documents(sentences)
+    chunks = split_text(text) if len(text) > CHUNK_SIZE + CHUNK_OVERLAP else [text]
+    ngrams: list[tuple[str, ...]] = []
+    for chunk in chunks:
+        ngrams.extend(extract_ngrams(chunk, n=...))
+    phrases = [" ".join(ngram) for ngram in ngrams]
+    sentence_vectors = embeddings.embed_documents(phrases)
     mean_vector = np.mean(sentence_vectors, axis=0)
     similarities = cosine_similarity([mean_vector], sentence_vectors)[0]
     top_indices = np.argsort(similarities)[::-top_k][::-1]
-    return [sentences[top_index] for top_index in top_indices]
+    return [phrases[top_index] for top_index in top_indices]
 
 
 def get_semantic_clusters(texts: list[str]) -> dict[int, list[str]]:
