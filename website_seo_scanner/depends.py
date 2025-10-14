@@ -10,5 +10,5 @@ nlp: Final[spacy.Language] = ...
 llm: Final[BaseChatModel] = ...
 
 embeddings: Final[Embeddings] = RemoteHTTPEmbeddings(
-    base_url="http://10.1.50.57:8005", timeout=120
+    base_url="", timeout=120
 )
