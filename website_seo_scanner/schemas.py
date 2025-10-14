@@ -1,6 +1,34 @@
+from __future__ import annotations
+
 from enum import StrEnum
 
 from pydantic import BaseModel, HttpUrl, NonNegativeFloat, NonNegativeInt
+
+
+class PageMeta(BaseModel):
+    """Мета-данные страницы"""
+    title: str
+    description: str
+
+
+class SitePage(BaseModel):
+    """Страница сайта.
+
+    Attributes:
+        url: URL адрес страницы.
+        meta: Meta-данные страницы (нужные для SEO продвижения).
+        text: Отчищенный текстовый контент страницы.
+    """
+    url: HttpUrl
+    meta: PageMeta
+    text: str
+    findings: list[PageFinding]
+    rendering_time: float
+
+
+class Site(BaseModel):
+    domain: str
+    pages: list[SitePage]
 
 
 class AboutSite(BaseModel):

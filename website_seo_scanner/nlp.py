@@ -1,43 +1,53 @@
-from typing import Final, Literal
+from typing import Final
 
 import re
 
 import nltk
 import numpy as np
 import polars as pl
-from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableSerializable
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-from pydantic import BaseModel, Field
-from sklearn.cluster import KMeans
-from sklearn.decomposition import TruncatedSVD
+from sklearn.cluster import HDBSCAN
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import silhouette_score
 from sklearn.metrics.pairwise import cosine_similarity
 
-from .depends import llm, nlp
+from .depends import embeddings, nlp
 
 nltk.download("stopwords")
 nltk.download("wordnet")
+
+CHUNK_SIZE, CHUNK_OVERLAP = 1024, 10
+# Минимальное число кластеров
+MIN_CLUSTER_SIZE = 2
+# Ключевая метрика для кластеризации
+HDBSCAN_METRIC = "euclidian"
 
 RANDOM_STATE = 42
 # Минимальное значение токена для пред обработки текста
 MIN_TOKEN = 2
 # Минимальная длина предложения для извлечения ключевых слов
 MIN_SENTENCE_LENGTH = 10
-# Промпт для извлечения ключевых слов используя LLM
-KEYWORDS_EXTRACTION_PROMPT = """
-"""
 # Загрузка стоп-слов для русского языка (слова несущие малую смысловую нагрузку)
 stopwords: Final[set[str]] = set(stopwords.words("russian"))
 
 
-class KeywordsResponse(BaseModel):
-    """Ответ LLM с извлечёнными ключевыми словами"""
-    keywords: list[str] = Field(..., description="Ключевые слова на странице")
+def split_sentences(text: str) -> list[str]:
+    return [
+        sentence.strip()
+        for sentence in text.split(".")
+        if len(sentence.strip()) > MIN_SENTENCE_LENGTH
+    ]
+
+
+def split_text(text: str) -> list[str]:
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        length_function=len,
+    )
+    return splitter.split_text(text)
 
 
 def compare_texts(text1: str, text2: str) -> float:
@@ -47,33 +57,61 @@ def compare_texts(text1: str, text2: str) -> float:
     return cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
 
 
-def extract_keywords(
-        text: str, strategy: Literal["llm", "ml", "tf-idf"] = "ml"
-) -> list[str]:
+def get_semantic_similarity(text1: str, text2: str) -> float:
+    """Рассчитывает семантическую близость двух текстов"""
+    vectors = [text1, text2]
+    return cosine_similarity(**vectors)[0][0]
+
+
+def extract_keywords(text: str) -> list[str]:
     """Извлекает ключевые слова из текста.
 
     :param text: Текст для извлечения ключевых слов.
-    :param strategy: Стратегия для извлечения: 'llm', 'ml', ...
     :return Список ключевых слов на странице.
     """
-    match strategy:
-        case "ml":
-            document = nlp(text)
-            return [
-                token.text for token in document if token.pos_ in {"NOUN", "PROPN", "ADJ"}
-            ]
-        case "llm":
-            parser = PydanticOutputParser(pydantic_object=KeywordsResponse)
-            prompt = (
-                ChatPromptTemplate
-                .from_messages(["system", KEYWORDS_EXTRACTION_PROMPT])
-                .partial(format_instructions=parser.get_format_instructions())
-            )
-            chain: RunnableSerializable[dict[str, str], KeywordsResponse] = prompt | llm | parser
-            response = chain.invoke({"text": text})
-            return response.keywords
-        case "tf-idf":
-            return ...
+    document = nlp(text)
+    return [
+        token.text for token in document if token.pos_ in {"NOUN", "PROPN", "ADJ"}
+    ]
+
+
+def extract_keyphrases(text: str, top_k: int) -> list[str]:
+    """Извлечение ключевых фраз из текста.
+
+    :param text: Текст из которого нужно извлечь ключевые фразы.
+    :param top_k: Количество получаемых ключевых фраз.
+    :return Извлечённые ключевые фразы.
+    """
+    sentences = split_sentences(text)
+    sentence_vectors = embeddings.embed_documents(sentences)
+    mean_vector = np.mean(sentence_vectors, axis=0)
+    similarities = cosine_similarity([mean_vector], sentence_vectors)[0]
+    top_indices = np.argsort(similarities)[::-top_k][::-1]
+    return [sentences[top_index] for top_index in top_indices]
+
+
+def get_semantic_clusters(texts: list[str]) -> dict[int, list[str]]:
+    """Получает семантические кластеры для текстов.
+    Использует transformers для векторизации и HDBSCAN для кластеризации.
+
+    :param texts: Тексты, которые нужно кластеризовать.
+    :return Маппинг индекса кластера и сгруппированных текстов.
+    (cluster -> list[texts])
+    """
+    vectors = embeddings.embed_documents(texts)
+    hdbscan = HDBSCAN(
+        min_cluster_size=MIN_CLUSTER_SIZE,
+        min_samples=None,
+        metric="euclidean",
+        cluster_selection_method="eom",
+    )
+    clusters = hdbscan.fit_predict(vectors)
+    groups: dict[int, list[str]] = {}
+    for _, (text, cluster) in enumerate(zip(texts, clusters, strict=False)):
+        if cluster not in groups:
+            groups[int(cluster)] = []
+        groups[cluster].append(text)
+    return groups
 
 
 def extract_keywords_using_tfidf(text: str, top_n: int = 20) -> ...:
@@ -114,93 +152,3 @@ def preprocess_text(text: str) -> str:
         if token not in stopwords and len(token) > MIN_TOKEN
     ]
     return " ".join(processed_tokens)
-
-
-def calculate_cluster_entropy(cluster_center: np.ndarray[float]) -> float:
-    """Расчет энтропии кластера для оценки его чистоты"""
-    normalized_center = np.abs(cluster_center)
-    if normalized_center.sum() == 0:
-        return 0.0
-    normalized_center /= normalized_center.sum()
-    # Расчет энтропии Шеннона
-    entropy = -np.sum(normalized_center * np.log2(normalized_center + 1e-10))
-    return float(entropy)
-
-
-def find_optimal_clusters(texts: list[str], max_features: int) -> int:
-    """Поиск оптимального количества текстовых кластеров методом силуэта.
-
-    :param texts: Тексты для кластеризации.
-    :param max_features: Выборка первых N признаков на основе количества.
-    :return Оптимальное число кластеров.
-    """
-    if len(texts) == 1:
-        return 1
-    vectorizer = TfidfVectorizer(
-        max_features=max_features,
-        min_df=1,
-        max_df=0.8,
-        stop_words=None
-    )
-    tfidf_matrix = vectorizer.fit_transform(texts)
-    # Метод локтя с силуэтным анализом
-    max_possible = min(10, len(texts) - 1)
-    best_score = -1
-    best_k = 2
-    for k in range(2, max_possible + 1):
-        try:
-            svd = TruncatedSVD(n_components=k)
-            lsi_vectors = svd.fit_transform(tfidf_matrix)
-            kmeans = KMeans(n_clusters=k, random_state=RANDOM_STATE, n_init=5)
-            clusters = kmeans.fit_predict(lsi_vectors)
-            if len(np.unique(clusters)) > 1:
-                score = silhouette_score(lsi_vectors, clusters)
-                if score > best_score:
-                    best_score = score
-                    best_k = k
-        except ValueError:
-            continue
-    return best_k
-
-
-def get_semantic_clusters(
-        texts: list[str], n_clusters: int = 5, max_features: int = 1000
-) -> ...:
-    """Получение смысловых кластеров в текстах
-
-    :param texts: Тексты для семантического анализа.
-    :param n_clusters: Количество кластеров.
-    :param max_features: Максимальное количество признаков.
-    :return ...
-    """
-    preprocessed_texts = [preprocess_text(text) for text in texts]
-    # TF-IDF векторизация текста
-    vectorizer = TfidfVectorizer(max_features=max_features, ngram_range=(1, 3))
-    tfidf_matrix = vectorizer.fit_transform(preprocessed_texts)
-    # LSI (Latent Semantic Indexing) с SVD
-    svd = TruncatedSVD(n_components=n_clusters, random_state=RANDOM_STATE)
-    lsi_vectors = svd.fit_transform(tfidf_matrix)
-    # Кластеризация
-    optimal_n_clusters = min(n_clusters, find_optimal_clusters(texts, max_features))
-    kmeans = KMeans(n_clusters=optimal_n_clusters, random_state=RANDOM_STATE)
-    clusters = kmeans.fit_predict(lsi_vectors)
-    # Ключевые слова для каждого кластера
-    cluster_keywords: dict[int, dict[str, list[str] | int]] = {}
-    feature_names = vectorizer.get_feature_names_out()
-    for cluster_id in range(n_clusters):
-        cluster_indices = np.where(clusters == cluster_id)[0]
-        if len(cluster_indices) > 0:
-            # Средний вектор для кластера
-            cluster_center = kmeans.cluster_centers_[cluster_id]
-            # Наиболее важные признаки
-            top_indices = cluster_center.argsort()[-10:][::-1]
-            top_keywords = [feature_names[i] for i in top_indices]
-            cluster_keywords[cluster_id] = {
-                "keywords": top_keywords,
-                "doc_count": len(cluster_indices)
-            }
-    return clusters, cluster_keywords
-
-
-def build_lsi_graph(text: str) -> ...:
-    ...

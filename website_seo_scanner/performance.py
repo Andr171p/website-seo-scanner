@@ -41,6 +41,6 @@ async def measure_page_rendering_time(page: Page, url: str) -> PageRenderingInfo
     :param url: URL адрес страницы.
     :return информация о рендеринге страницы.
     """
-    await page.goto(url, wait_until="networkidle")
+    await page.goto(url, wait_until="domcontentloaded")
     response = await page.evaluate(JS_PERFORMANCE_SCRIPT)
     return PageRenderingInfo.model_validate(response)

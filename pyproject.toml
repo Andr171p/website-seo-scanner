@@ -7,6 +7,7 @@ dependencies = [
     "bs4>=0.0.2",
     "ddgs>=9.6.0",
     "duckduckgo-search>=8.1.1",
+    "embeddings-service[langchain]",
     "fastapi[all]>=0.118.0",
     "fastmcp>=2.12.4",
     "html2text>=2025.4.15",
@@ -20,6 +21,7 @@ dependencies = [
     "ruff>=0.13.2",
     "scikit-learn>=1.7.2",
     "spacy>=3.8.7",
+    "sqlalchemy>=2.0.43",
     "ultimate-sitemap-parser>=1.6.0",
 ]
 
@@ -150,3 +152,6 @@ ignore_names = [
     "delete",
     "head"
 ]
+
+[tool.uv.sources]
+embeddings-service = { git = "https://github.com/Andr171p/embeddings-service.git" }
