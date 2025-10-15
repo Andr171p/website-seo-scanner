@@ -1,14 +1,10 @@
 from typing import Final
 
-import spacy
 from embeddings_service.langchain import RemoteHTTPEmbeddings
 from langchain_core.embeddings import Embeddings
-from langchain_core.language_models import BaseChatModel
 
-nlp: Final[spacy.Language] = ...
-
-llm: Final[BaseChatModel] = ...
+from .settings import settings
 
 embeddings: Final[Embeddings] = RemoteHTTPEmbeddings(
-    base_url="", timeout=120
+    base_url=settings.embeddings.base_url, timeout=120
 )
