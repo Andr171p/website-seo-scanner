@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import random
 from collections.abc import Iterator
 from datetime import datetime
 from urllib.parse import urlparse
@@ -27,6 +26,16 @@ PRIORITY_KEYWORDS: tuple[str, ...] = (
     "buy",
     "order",
     "cases",
+)
+# Запрещённые endpoints
+DENIED_EXTENSIONS: tuple[str, ...] = (
+    ".php", ".asp", ".aspx", ".jsp", ".cgi",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+    ".zip", ".rar", ".tar", ".gz",
+    ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp",
+    ".mp4", ".avi", ".mov", ".wmv",
+    ".mp3", ".wav", ".ogg",
+    ".css", ".js", ".json", ".xml"
 )
 
 
@@ -147,14 +156,14 @@ class TreeNode(BaseModel):
                 latest = node.last_modified
         return latest
 
-    def last_changed_node(self) -> TreeNode:
+    def last_changed_node(self) -> TreeNode | None:
         """Последняя изменённая страница"""
-        latest_node = self
-        for node in self.iter_nodes():
-            if node.last_modified and \
-                    (latest_node is None or node.last_modified > latest_node.last_modified):
-                latest_node = node
-        return latest_node
+        nodes: list[TreeNode] = [
+            node
+            for node in self.iter_nodes()
+            if node.last_modified is not None
+        ]
+        return max(nodes, key=lambda x: x.last_modified, default=None)
 
     def __hash__(self) -> int:
         return hash(self.url)
@@ -211,18 +220,94 @@ def build_site_tree(url: str) -> TreeNode:
     return root
 
 
-def extract_key_pages(tree: TreeNode, max_result: int = 15) -> set[HttpUrl]:
+def _get_path_segments(url: HttpUrl) -> list[str]:
+    """Получение сегментов URL адреса,
+    пример: 'http://example.ru/services/3' -> ['services', '3']
+
+    :param url: Адрес страницы для разбиения.
+    :return Секции на странице.
+    """
+    parsed = urlparse(str(url))
+    return [section for section in parsed.path.strip("/").split("/") if section]
+
+
+def _sort_by_last_modified(nodes: list[TreeNode]) -> list[TreeNode]:
+    """Сортировка по последней дате изменений"""
+    with_dates: list[TreeNode] = []
+    without_dates: list[TreeNode] = []
+    for node in nodes:
+        if node.last_modified is None:
+            without_dates.append(node)
+        else:
+            with_dates.append(node)
+    with_dates.sort(key=lambda node: node.last_modified, reverse=True)
+    return with_dates + without_dates
+
+
+def _is_denied_url(url: HttpUrl) -> bool:
+    """Проверка URL на запрещённый, True если запрещён, False если разрешён"""
+    return not any(
+        str(url).split(".")[-1].lower().endswith(extension) for extension in DENIED_EXTENSIONS
+    )
+
+
+def _get_node_sort_key(node: TreeNode) -> tuple[float, float, float]:
+    """Сортировка узлов
+     - Высокий приоритет из sitemap.xml (если есть)
+     - Дата изменения (сначала новые)
+     - Глубина узла (малая глубина сначала)
+    """
+    priority_score = node.priority if node.priority is not None else 0.5
+    date_score = node.last_modified.timestamp() if node.last_modified else 0
+    depth_penalty = len(_get_path_segments(node.url)) * 0.01
+    return -priority_score, -date_score, depth_penalty
+
+
+def extract_key_pages(  # noqa: C901
+        tree: TreeNode, key_segments: list[str], max_result: int = 15
+) -> set[HttpUrl]:
     """Извлекает URL ключевых страниц сайта.
 
     :param tree: Дерево сайта.
+    :param key_segments: Ключевые секции сайта которые нужно посетить.
     :param max_result: Максимальное количество извлекаемых страниц.
     """
-    key_pages: set[HttpUrl] = {tree.url, tree.last_changed_node()}  # Первые ключевые страницы
-    visited_pages: set[...] = set()
+    key_pages: set[HttpUrl] = {tree.url}  # Добавление главной страницы сайта
+    nodes_with_key_segments: list[TreeNode] = []  # Узлы содержащие ключевые сегменты
+    used_segments: set[str] = set()  # Использованные сегменты для избежания двойной обработки
+    # Добавление последней изменённой страницы
+    last_changed_node = tree.last_changed_node()
+    if last_changed_node is not None:
+        key_pages.add(last_changed_node.url)
     for node in tree.iter_nodes():
-        if any(
-                priority_keyword in str(node.url).lower() for priority_keyword in PRIORITY_KEYWORDS
-        ):
-            key_pages.add(node.url)
-            key_pages.add(random.choice(node.children))  # noqa: S311
-    return key_pages[::max_result]
+        if len(key_pages) > max_result:
+            break
+        segments = _get_path_segments(node.url)
+        # Проверка наличия ключевых сегментов в пути
+        has_key_segment = any(key_segment in segments for key_segment in key_segments)
+        if has_key_segment and _is_denied_url(node.url):
+            nodes_with_key_segments.append(node)
+    nodes_with_key_segments.sort(key=_get_node_sort_key)
+    for node_with_key_segment in nodes_with_key_segments:
+        if len(key_pages) >= max_result:
+            break
+        segments = _get_path_segments(node_with_key_segment.url)
+        # Нахождение ключевого сегмента в узле
+        found_key_segment = next((
+            key_segment for key_segment in key_segments if key_segment in segments
+        ), None)
+        if found_key_segment is not None and found_key_segment not in used_segments:
+            key_pages.add(node_with_key_segment.url)
+            used_segments.add(found_key_segment)
+            # Добавление свежих дочерних страниц из текущей директории
+            if not node_with_key_segment.is_leaf:
+                children = _sort_by_last_modified(node_with_key_segment.children)
+                for child in children:
+                    if len(key_pages) < max_result and _is_denied_url(child.url):
+                        key_pages.add(child.url)
+    # Если не набрано достаточное количество страниц, то добавляются популярные листья
+    if len(key_pages) < max_result:
+        leaves = list(tree.iter_leaves())
+        leaves.sort(key=_get_node_sort_key)
+        key_pages.update(leaf.url for leaf in leaves[:max_result - len(key_pages)])
+    return key_pages

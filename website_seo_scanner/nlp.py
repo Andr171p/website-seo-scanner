@@ -107,8 +107,7 @@ def extract_keyphrases(text: str, top_n: int = 5) -> list[str]:
     text_embedding = embeddings.embed_documents([text])
     candidate_embeddings = embeddings.embed_documents(candidates)
     distances = cosine_similarity(text_embedding, candidate_embeddings)
-    keyphrases = [candidates[index] for index in distances.argsort()]
-    return keyphrases[-top_n:]
+    return [candidates[index] for index in distances.argsort()[0][-top_n:]]
 
 
 def get_semantic_clusters(texts: list[str]) -> dict[int, list[str]]:

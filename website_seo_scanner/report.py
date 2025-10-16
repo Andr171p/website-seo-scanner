@@ -8,6 +8,7 @@ from pydantic import BaseModel, HttpUrl, NonNegativeFloat, NonNegativeInt
 from .linting import FindingLevel, PageFinding, lint_page
 from .nlp import compare_texts
 from .performance import measure_page_rendering_time
+from .utils import extract_page_text
 
 # Оптимальное время рендеринга страницы в секундах
 OPTIMAL_PAGE_LOAD_TIME = 2.5
@@ -43,7 +44,7 @@ async def get_meta_relevance_score(page: Page) -> float:
         const meta = document.querySelector('meta[name="description"]');
         return meta ? meta.content : null;
     }""")
-    content = await page.locator("body").inner_text()
+    content = await extract_page_text(page)
     similarity_score = compare_texts(meta_description, content)
     return round(similarity_score, 2) * 100
 
