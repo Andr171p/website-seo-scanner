@@ -288,7 +288,6 @@ def check_meta_and_body_relevance(soup: BeautifulSoup) -> list[PageFinding]:
             element="body"
         )]
     text = clean(html2text.html2text(str(body)))
-    print(text)
     similarity_score = compare_texts(content, text)
     if CRITICAL_RELEVANCE_SCORE < similarity_score < SHORT_RELEVANCE_SCORE:
         findings.append(PageFinding(
