@@ -175,7 +175,7 @@ class TreeNode(BaseModel):
 
 
 def add_page_to_tree(
-        base_url: str,
+        base_url: HttpUrl,
         root: TreeNode,
         page: SitemapPage,
         segments: list[str],
@@ -189,7 +189,7 @@ def add_page_to_tree(
     )
     if node is None:
         path_part = "/".join(segments[:current_depth + 1])
-        full_url = f"{base_url.rstrip("/")}/{path_part}"
+        full_url = f"{str(base_url).rstrip("/")}/{path_part}"
         node = TreeNode.model_validate({
             "name": current_segment,
             "url": full_url,
@@ -200,20 +200,20 @@ def add_page_to_tree(
     add_page_to_tree(base_url, node, page, segments, current_depth + 1)
 
 
-def build_site_tree(url: str) -> TreeNode:
+def build_site_tree(url: HttpUrl) -> TreeNode:
     """Рекурсивно строит дерево сайта по страницам из sitemap.xml.
 
     :param url: URL адрес сайта.
     :return Построенное дерево структуры сайта.
     """
     name = (
-        url
+        str(url)
         .replace("http://", "")
         .replace("https://", "")
         .replace("/", "")
     )
-    root = TreeNode(name=name, url=HttpUrl(url))
-    sitemap = sitemap_tree_for_homepage(url, use_robots=False)
+    root = TreeNode(name=name, url=url)
+    sitemap = sitemap_tree_for_homepage(str(url), use_robots=False)
     for page in sitemap.all_pages():
         segments = parse_url_path(page.url)
         add_page_to_tree(url, root, page, segments)
@@ -265,12 +265,13 @@ def _get_node_sort_key(node: TreeNode) -> tuple[float, float, float]:
 
 def extract_key_pages(  # noqa: C901
         tree: TreeNode, key_segments: list[str], max_result: int = 15
-) -> set[HttpUrl]:
+) -> list[HttpUrl]:
     """Извлекает URL ключевых страниц сайта.
 
     :param tree: Дерево сайта.
     :param key_segments: Ключевые секции сайта которые нужно посетить.
     :param max_result: Максимальное количество извлекаемых страниц.
+    :return Уникальные ключевые URL адреса сайта.
     """
     key_pages: set[HttpUrl] = {tree.url}  # Добавление главной страницы сайта
     nodes_with_key_segments: list[TreeNode] = []  # Узлы содержащие ключевые сегменты
@@ -310,4 +311,4 @@ def extract_key_pages(  # noqa: C901
         leaves = list(tree.iter_leaves())
         leaves.sort(key=_get_node_sort_key)
         key_pages.update(leaf.url for leaf in leaves[:max_result - len(key_pages)])
-    return key_pages
+    return list(key_pages)

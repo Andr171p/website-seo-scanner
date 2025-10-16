@@ -1,7 +1,13 @@
-from website_seo_scanner.tree import PRIORITY_KEYWORDS, build_site_tree, extract_key_pages
+import asyncio
 
-tree = build_site_tree("https://tyumen-soft.ru/")
+from website_seo_scanner.services import get_site_report
 
-key_pages = extract_key_pages(tree, list(PRIORITY_KEYWORDS), max_result=15)
+url = "https://tyumen-soft.ru/"
 
-print(key_pages)
+
+async def main() -> None:
+    site_report = await get_site_report(url)
+    print(site_report)
+
+
+asyncio.run(main())

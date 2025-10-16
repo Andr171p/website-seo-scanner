@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterator
 
 from bs4 import BeautifulSoup
 from ddgs import DDGS
@@ -138,3 +139,17 @@ def websearch(query: str, max_results: int = 7) -> list[SearchResult]:
         return [SearchResult.model_validate({
             "title": result["title"], "url": result["href"]
         }) for result in ddg.text(query, max_results=max_results)]
+
+
+async def iter_pages(browser: Browser, urls: list[HttpUrl]) -> AsyncIterator[Page]:
+    """Итерация по Playwright страницам.
+    Открывает страницу используя Stealth context.
+
+    :param browser: Текущий Playwright браузер.
+    :param urls: URL страниц, которые нужно посетить.
+    :return Открытая страница.
+    """
+    for url in urls:
+        page = await get_current_page(browser)
+        await page.goto(str(url))
+        yield page

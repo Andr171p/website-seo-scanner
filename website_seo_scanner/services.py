@@ -1,33 +1,27 @@
-from .ai.utils import generate_search_queries
-from .report import PageReport, form_page_report
-from .schemas import AboutSite
-from .tree import build_site_tree, extract_key_pages
-from .utils import SearchResult, websearch
+from playwright.async_api import async_playwright
+from pydantic import HttpUrl
 
-DEFAULT_MAX_PAGE_RESULTS = 7
-
-
-async def search_site_competitors(
-        about_site: AboutSite, max_page_results: int = DEFAULT_MAX_PAGE_RESULTS
-) -> list[SearchResult]:
-    """Выполняет поиск потенциальных конкурентов сайта, основываясь на информации о нём.
-
-    :param about_site: Информация о текущем сайте.
-    :param max_page_results: Максимальное количество сайтов конкурентов на странице.
-    :return Список уникальных результатов поиска.
-    """
-    results: set[SearchResult] = set()
-    queries = await generate_search_queries(about_site)
-    for query in queries:
-        results.update(websearch(query, max_results=max_page_results))
-    return list(results)
+from .linting import lint_page
+from .performance import measure_page_rendering_time
+from .schemas import PageReport, SiteReport
+from .tree import PRIORITY_KEYWORDS, build_site_tree, extract_key_pages
+from .utils import extract_page_meta, iter_pages
 
 
-async def analyze_site_seo_optimization(url: str) -> ...:
-    site_tree = build_site_tree(url)
-    pages = extract_key_pages(site_tree)
+async def get_site_report(url: HttpUrl) -> SiteReport:
+    tree = build_site_tree(url)
+    urls = extract_key_pages(tree, list(PRIORITY_KEYWORDS), max_result=15)
     page_reports: list[PageReport] = []
-    for page in pages:
-        page_report = await form_page_report(page)
-        page_reports.append(page_report)
-    return page_reports
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=False)
+        async for page in iter_pages(browser, urls):
+            rendering_info = await measure_page_rendering_time(page, page.url)
+            findings = await lint_page(page)
+            meta = await extract_page_meta(page)
+            page_reports.append(PageReport(
+                url=HttpUrl(page.url),
+                meta=meta,
+                findings=findings,
+                rendering_time=rendering_info.dom_content_loaded / 100
+            ))
+    return SiteReport(base_url=url, pages=page_reports)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, HttpUrl, NonNegativeFloat, NonNegativeInt
+from pydantic import BaseModel, HttpUrl, NonNegativeFloat
 
 
 class PageMeta(BaseModel):
@@ -11,24 +11,22 @@ class PageMeta(BaseModel):
     description: str
 
 
-class SitePage(BaseModel):
+class PageReport(BaseModel):
     """Страница сайта.
 
     Attributes:
         url: URL адрес страницы.
         meta: Meta-данные страницы (нужные для SEO продвижения).
-        text: Отчищенный текстовый контент страницы.
     """
     url: HttpUrl
     meta: PageMeta
-    text: str
     findings: list[PageFinding]
-    rendering_time: float
+    rendering_time: NonNegativeFloat
 
 
-class Site(BaseModel):
-    domain: str
-    pages: list[SitePage]
+class SiteReport(BaseModel):
+    base_url: HttpUrl
+    pages: list[PageReport]
 
 
 class AboutSite(BaseModel):
@@ -78,22 +76,3 @@ class PageFinding(BaseModel):
     message: str
     category: str
     element: str
-
-
-class ReportLevels(BaseModel):
-    """Распределения количества замечаний по уровням значимости"""
-    critical: NonNegativeInt
-    errors: NonNegativeInt
-    warnings: NonNegativeInt
-    infos: NonNegativeInt
-    good: NonNegativeInt
-    great: NonNegativeInt
-
-
-class PageReport(BaseModel):
-    """SEO отчет по странице"""
-    url: HttpUrl
-    rendering_time: NonNegativeFloat
-    meta_relevance_score: NonNegativeFloat
-    findings: list[PageFinding]
-    levels: ReportLevels
