@@ -11,22 +11,23 @@ class PageMeta(BaseModel):
     description: str
 
 
-class PageReport(BaseModel):
-    """Страница сайта.
-
-    Attributes:
-        url: URL адрес страницы.
-        meta: Meta-данные страницы (нужные для SEO продвижения).
-    """
-    url: HttpUrl
+class PageContent(BaseModel):
     meta: PageMeta
-    findings: list[PageFinding]
+    text: str = ""
+
+
+class SitePage(BaseModel):
+    """Страница сайта"""
+    url: HttpUrl
     rendering_time: NonNegativeFloat
+    findings: list[PageFinding]
+    content: PageContent
 
 
-class SiteReport(BaseModel):
-    base_url: HttpUrl
-    pages: list[PageReport]
+class SemanticCore(BaseModel):
+    """Семантическое ядро"""
+    keywords: list[str]
+    keyphrases: list[str]
 
 
 class AboutSite(BaseModel):

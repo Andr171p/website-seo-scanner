@@ -2,12 +2,13 @@ from typing import Final
 
 import logging
 import re
+from enum import StrEnum
 
 from bs4 import BeautifulSoup
 from playwright.async_api import Page
+from pydantic import BaseModel
 
 from .nlp import compare_texts
-from .schemas import FindingLevel, PageFinding
 
 OPTIMAL_TITLE_LENGTH = 55
 OPTIMAL_TITLE_DELTA = 10
@@ -20,6 +21,32 @@ SHORT_RELEVANCE_SCORE, CRITICAL_RELEVANCE_SCORE = 0.5, 0.3
 GREAT_SEMANTIC_TAG_COUNT = 4
 
 logger = logging.getLogger(__name__)
+
+
+class FindingLevel(StrEnum):
+    """Уровни значимости замечания"""
+    CRITICAL = "critical"
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+    OPTIMAL = "optimal"
+    GOOD = "good"
+    GREAT = "great"
+
+
+class PageFinding(BaseModel):
+    """Проблема на странице
+
+    Attributes:
+        level: Значимость замечания.
+        message: Человеко-читаемое сообщение.
+        category: Категория к которой относится замечание, например: 'heading', 'title', ...
+        element: Элемент страницы к которому относится замечание.
+    """
+    level: FindingLevel
+    message: str
+    category: str
+    element: str
 
 
 def check_title(soup: BeautifulSoup) -> list[PageFinding]:
