@@ -802,6 +802,17 @@ wheels = [
 ]
 
 [[package]]
+name = "html-to-markdown"
+version = "2.3.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/e0/0a67404eefc49cd97565e8fe8739c4a24d754a4047cc1bdd262e5eadd467/html_to_markdown-2.3.4.tar.gz", hash = "sha256:6f2fd7e0a2849963255810644c23c4032aede06e4c31c4e1802a004e908f8b7c", size = 1906082 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c5/fe/706353b0b3216d88a9908072a34e2064ce22baae44cea65f9fcc67f65489/html_to_markdown-2.3.4-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:b05e846992f4c9baa7388db947beb4558a7a5242138969e2cc7585c9fd7173e7", size = 4809869 },
+    { url = "https://files.pythonhosted.org/packages/89/1e/db150654599197e750d806afdc1b9d71d5c4a98a245b44435c17691f97ca/html_to_markdown-2.3.4-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:b0950d9f1549dfeff3489c14f2060676f9a2cea86ef2255b583ff7d497ce31b6", size = 5331237 },
+    { url = "https://files.pythonhosted.org/packages/a2/fc/281bec596011114380e57d67d1fbc37bf1b53e86b52fcfa74cca6feb6a65/html_to_markdown-2.3.4-cp310-abi3-win_amd64.whl", hash = "sha256:5a176471b518a8ab3cb093d50c324fa9956b3688911fbd07d01e3f8a627f7c07", size = 5080125 },
+]
+
+[[package]]
 name = "html2text"
 version = "2025.4.15"
 source = { registry = "https://pypi.org/simple" }
@@ -3264,6 +3275,7 @@ dependencies = [
     { name = "embeddings-service", extra = ["langchain"] },
     { name = "fastapi", extra = ["all"] },
     { name = "fastmcp" },
+    { name = "html-to-markdown" },
     { name = "html2text" },
     { name = "langchain" },
     { name = "langchain-gigachat" },
@@ -3290,6 +3302,7 @@ requires-dist = [
     { name = "embeddings-service", extras = ["langchain"], git = "https://github.com/Andr171p/embeddings-service.git" },
     { name = "fastapi", extras = ["all"], specifier = ">=0.118.0" },
     { name = "fastmcp", specifier = ">=2.12.4" },
+    { name = "html-to-markdown", specifier = ">=2.3.4" },
     { name = "html2text", specifier = ">=2025.4.15" },
     { name = "langchain", specifier = ">=0.3.27" },
     { name = "langchain-gigachat", specifier = ">=0.3.12" },

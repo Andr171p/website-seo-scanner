@@ -1,5 +1,9 @@
+import logging
+
 from playwright.async_api import Page
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 # JS скрипт для анализа производительности рендеринга страницы
 JS_PERFORMANCE_SCRIPT = """
@@ -43,4 +47,5 @@ async def measure_page_rendering_time(page: Page, url: str) -> PageRenderingInfo
     """
     await page.goto(url, wait_until="domcontentloaded")
     response = await page.evaluate(JS_PERFORMANCE_SCRIPT)
+    logger.info("Measured rendering time of page %s", url, extra=response)
     return PageRenderingInfo.model_validate(response)

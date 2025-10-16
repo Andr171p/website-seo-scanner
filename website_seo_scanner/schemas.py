@@ -24,10 +24,19 @@ class SitePage(BaseModel):
     content: PageContent
 
 
+class ThematicCluster(BaseModel):
+    name: str
+    keywords: list[str]
+    keyphrases: list[str]
+    relevance_score: NonNegativeFloat
+    pages: list[HttpUrl]
+
+
 class SemanticCore(BaseModel):
     """Семантическое ядро"""
     keywords: list[str]
     keyphrases: list[str]
+    thematic_clusters: list[ThematicCluster]
 
 
 class AboutSite(BaseModel):

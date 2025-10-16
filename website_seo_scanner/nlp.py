@@ -1,4 +1,4 @@
-from typing import Final
+from typing import Final, Literal
 
 import re
 
@@ -52,6 +52,10 @@ def preprocess_text(text: str) -> str:
     return " ".join(processed_tokens)
 
 
+def _is_text_large(text: str) -> bool:
+    return text > ...
+
+
 def split_text(
         text: str, chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP
 ) -> list[str]:
@@ -61,10 +65,28 @@ def split_text(
     return splitter.split_text(text)
 
 
-def compare_texts(text1: str, text2: str) -> float:
+def compare_texts(
+        text1: str,
+        text2: str,
+        similarity_strategy: Literal["max", "mean", "median", "std"] = "mean"
+) -> float:
     """Сравнивает семантическую релевантность двух текстов"""
-    vectors = embeddings.embed_documents([text1, text2])
-    return cosine_similarity(vectors[0], vectors[1])[0][0]
+    chunks1, chunks2 = split_text(text1), split_text(text2)
+    vectors = embeddings.embed_documents(chunks1 + chunks2)
+    vectors1, vectors2 = vectors[:len(chunks1)], vectors[len(chunks1):]
+    similarity_matrix = cosine_similarity(vectors1, vectors2)
+    match similarity_strategy:
+        case "max":
+            similarity_score = np.max(similarity_matrix)
+        case "mean":
+            similarity_score = np.mean(similarity_matrix)
+        case "median":
+            similarity_score = np.median(similarity_matrix)
+        case "std":
+            similarity_score = np.std(similarity_matrix)
+        case _:
+            similarity_score = np.nan
+    return float(similarity_score)
 
 
 def extract_keywords(text: str, top_n: int = 10) -> list[str]:
@@ -93,15 +115,18 @@ def extract_keywords(text: str, top_n: int = 10) -> list[str]:
     }).sort("scores", descending=True).head(top_n)["keywords"].to_list()
 
 
-def extract_keyphrases(text: str, top_n: int = 5) -> list[str]:
+def extract_keyphrases(
+        text: str, top_n: int = 5, ngram_range: tuple[int, int] = (5, 5)
+) -> list[str]:
     """Извлечение ключевых фраз из текста.
 
     :param text: Входной текст.
     :param top_n: Количество возвращаемых ключевых фраз.
+    :param ngram_range: Размер Н-граммы.
     :return Извлечённые ключевые фразы.
     """
     preprocessed_text = preprocess_text(text)
-    count_vectorizer = CountVectorizer(ngram_range=(5, 5), stop_words=STOPWORDS)
+    count_vectorizer = CountVectorizer(ngram_range=ngram_range, stop_words=STOPWORDS)
     count_vectorizer.fit([preprocessed_text])
     candidates = count_vectorizer.get_feature_names_out()
     text_embedding = embeddings.embed_documents([text])

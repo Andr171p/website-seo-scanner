@@ -1,12 +1,13 @@
 import logging
 from collections.abc import AsyncIterator
 
+import html_to_markdown
 from bs4 import BeautifulSoup
 from ddgs import DDGS
-from html2text import html2text
 from playwright.async_api import Browser, Page
 from pydantic import BaseModel, HttpUrl
 
+from .cleaners import clean
 from .schemas import PageMeta
 from .stealth import create_new_stealth_context
 
@@ -110,8 +111,8 @@ async def extract_page_text(page: Page) -> str:
     body = soup.find("body")
     if body is None:
         return ""
-    content = body.get_text(separator="\n", strip=True)
-    return html2text(content)
+    md_text = html_to_markdown.convert(str(body))
+    return clean(md_text)
 
 
 async def extract_page_meta(page: Page) -> PageMeta:

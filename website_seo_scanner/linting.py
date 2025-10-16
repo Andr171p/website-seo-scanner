@@ -4,10 +4,12 @@ import logging
 import re
 from enum import StrEnum
 
+import html2text
 from bs4 import BeautifulSoup
 from playwright.async_api import Page
 from pydantic import BaseModel
 
+from .cleaners import clean
 from .nlp import compare_texts
 
 OPTIMAL_TITLE_LENGTH = 55
@@ -270,7 +272,7 @@ def check_semantic_structure(soup: BeautifulSoup) -> list[PageFinding]:
     return findings
 
 
-def check_meta_and_content_similarity(soup: BeautifulSoup) -> list[PageFinding]:
+def check_meta_and_body_relevance(soup: BeautifulSoup) -> list[PageFinding]:
     """Проверяет сематическое соответствие между meta-описанием и контентом на странице"""
     findings: list[PageFinding] = []
     meta_description = soup.find("meta", attrs={"name": "description"})
@@ -285,7 +287,8 @@ def check_meta_and_content_similarity(soup: BeautifulSoup) -> list[PageFinding]:
             category="semantic",
             element="body"
         )]
-    text = body.get_text(separator="\n", strip=True)
+    text = clean(html2text.html2text(str(body)))
+    print(text)
     similarity_score = compare_texts(content, text)
     if CRITICAL_RELEVANCE_SCORE < similarity_score < SHORT_RELEVANCE_SCORE:
         findings.append(PageFinding(
@@ -329,5 +332,5 @@ async def lint_page(page: Page) -> list[PageFinding]:
         *check_heading(soup),
         *check_images(soup),
         *check_semantic_structure(soup),
-        *check_meta_and_content_similarity(soup),
+        *check_meta_and_body_relevance(soup),
     ]
